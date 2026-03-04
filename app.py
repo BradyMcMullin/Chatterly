@@ -24,6 +24,11 @@ def api_create_user():
 def api_get_feed(account_id):
     feed = social_db.get_feed(account_id) 
     return jsonify(feed), 200
+@app.route('/api/catchup', methods=['GET'])
+def api_get_catchup_feed():
+	feed = social_db.get_catch_up_feed()
+	return jsonify(feed), 200
+
 
 @app.route('/api/posts', methods=['POST'])
 @app.route('/api/posts', methods=['POST'])

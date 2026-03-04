@@ -43,3 +43,18 @@ def get_feed(account_id):
     posts = conn.execute(query, (account_id, account_id)).fetchall()
     conn.close()
     return [dict(post) for post in posts]
+
+def get_catch_up_feed(limit=10):
+	conn = get_db_connection()
+	query = """
+	    SELECT p.*, u.username
+	    FROM posts p
+	    JOIN accounts a ON p.account_id = a.account_id
+	    JOIN users u ON a.user_id = u.user_id
+	    WHERE p.created_at >= datetime('now', '-7 days')
+	    ORDER BY p.like_count DESC, p.comment_count DESC, p.created_at DESC
+	    LIMIT ?;
+	"""
+	posts = conn.execute(query, (limit,)).fetchall()
+	conn.close()
+	return [dict(post) for post in posts]
