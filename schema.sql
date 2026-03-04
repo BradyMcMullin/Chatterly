@@ -27,6 +27,39 @@ CREATE TABLE followers(
   CHECK (follower_id <> followed_id)
 );
 
+CREATE TABLE blocks(
+  blocker_id INTEGER NOT NULL,
+  blocked_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (blocker_id, blocked_id),
+  FOREIGN KEY (blocker_id) REFERENCES accounts(account_id) ON DELETE CASCADE,
+  FOREIGN KEY (blocked_id) REFERENCES accounts(account_id) ON DELETE CASCADE,
+  CHECK (blocker_id <> blocked_id)
+);
+
+CREATE INDEX idx_blocks_blocker_id ON blocks(blocker_id);
+CREATE INDEX idx_blocks_blocked_id ON blocks(blocked_id);
+
+CREATE TRIGGER prevent_follow_when_blocked
+BEFORE INSERT ON followers
+WHEN EXISTS (
+    SELECT 1
+    FROM blocks
+    WHERE (blocker_id = NEW.follower_id AND blocked_id = NEW.followed_id)
+    OR (blocker_id = NEW.followed_id AND blocked_id = NEW.follower_id)
+)
+BEGIN 
+    SELECT RAISE(ABORT, 'cannot follow when blocked');
+END;
+
+CREATE TRIGGER remove_follows_on_block
+AFTER INSERT ON blocks
+BEGIN
+    DELETE FROM followers
+    WHERE (follower_id = NEW.blocker_id AND followed_id = NEW.blocked_id)
+    OR (follower_id = NEW.blocked_id AND followed_id = NEW.blocker_id);
+END;
+
 CREATE TABLE posts(
   post_id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id INTEGER NOT NULL,
@@ -147,6 +180,11 @@ INSERT INTO followers (follower_id, followed_id) VALUES
 (1, 2), -- Alice follows Bob
 (1, 3), -- Alice follows Charlie
 (2, 1); -- Bob follows Alice
+
+-- 3. Create Blocks
+-- (Because of your triggers, this will auto-update follower/following counts in accounts!)
+INSERT INTO blocks (blocker_id, blocked_id) VALUES
+(1, 2); -- Alice blocked Bob
 
 -- 4. Create Posts
 INSERT INTO posts (account_id, content) VALUES 
