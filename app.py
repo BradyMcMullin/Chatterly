@@ -25,17 +25,20 @@ def api_get_feed(account_id):
     feed = social_db.get_feed(account_id) 
     return jsonify(feed), 200
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
-
+@app.route('/api/posts', methods=['POST'])
 @app.route('/api/posts', methods=['POST'])
 def api_create_post():
     data = request.get_json()
-    account_id = data.get('account_id')
-    content = data.get('content')
+    raw_account_data = data.get('account_id')
 
-    if not content:
-        return jsonify({"success": False, "error": "Content is required"}), 400
+    # If the data is that big Vue object you see in the logs:
+    if isinstance(raw_account_data, dict) and '_value' in raw_account_data:
+        account_id = raw_account_data['_value']
+    else:
+        account_id = raw_account_data
+
+    # Now we have the raw number (1), we can proceed safely
+    content = data.get('content')
 
     conn = social_db.get_db_connection()
     try:
@@ -47,6 +50,10 @@ def api_create_post():
         conn.commit()
         return jsonify({"success": True, "post_id": cursor.lastrowid}), 201
     except Exception as e:
+        print(f"DATABASE ERROR: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
         conn.close()
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

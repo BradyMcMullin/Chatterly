@@ -26,17 +26,20 @@ def create_user(email, username, first_name="", last_name=""):
 
 
 def get_feed(account_id):
-    # get te most recent post from followed accounts
     conn = get_db_connection()
+    # Updated query to include your own posts
     query = """
-        SELECT p.*, a.user_id
+        SELECT p.*, u.username
         FROM posts p
-        JOIN followers f ON p.account_id = f.followed_id
         JOIN accounts a ON p.account_id = a.account_id
-        WHERE f.follower_id = ?
+        JOIN users u ON a.user_id = u.user_id
+        LEFT JOIN followers f ON p.account_id = f.followed_id
+        WHERE f.follower_id = ? OR p.account_id = ?
+        GROUP BY p.post_id
         ORDER BY p.created_at DESC
         LIMIT 50;
     """
-    posts = conn.execute(query, (account_id,)).fetchall()
+    # Note: We pass (account_id,) twice—once for the follower check, once for the self check
+    posts = conn.execute(query, (account_id, account_id)).fetchall()
     conn.close()
     return [dict(post) for post in posts]
