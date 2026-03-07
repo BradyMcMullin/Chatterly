@@ -24,6 +24,30 @@ def create_user(email, username, first_name="", last_name=""):
     finally:
         conn.close()
 
+def create_account(user_id, handle):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        # Insert the handle into the accounts table
+        cursor.execute(
+            "INSERT INTO accounts (user_id, handle) VALUES (?, ?)",
+            (user_id, handle)
+        )
+        account_id = cursor.lastrowid
+
+        # Create the associated profile info
+        cursor.execute("INSERT INTO profile_info (bio) VALUES (?)", (f"Welcome to @{handle}!",))
+        info_id = cursor.lastrowid
+        
+        conn.execute("INSERT INTO profiles (account_id, info_id) VALUES (?, ?)", (account_id, info_id))
+        
+        conn.commit()
+        return {"success": True, "account_id": account_id}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
 
 def get_feed(account_id):
     conn = get_db_connection()

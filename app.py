@@ -31,6 +31,7 @@ def api_get_account_info(account_id):
     account = social_db.get_profile(account_id)
     return jsonify(account), 200
 
+
 @app.route('/api/users/<int:account_id>', methods=['POST'])
 def api_add_profile_info(account_id, body):
     account_info = {"first_name":"", "last_name":"", "creation_date":"", "bio":"", "age":""}
@@ -64,6 +65,32 @@ def api_get_all_accounts():
     ''').fetchall()
     conn.close()
     return jsonify([dict(row) for row in accounts]), 200
+
+@app.route('/api/accounts/<int:user_id>', methods=['GET'])
+def api_get_my_accounts(user_id):
+    conn = social_db.get_db_connection()
+    try:
+        # We select 'handle' from accounts. 
+        # No need to join 'users' anymore if we just want the handles!
+        accounts = conn.execute('''
+            SELECT account_id, handle 
+            FROM accounts 
+            WHERE user_id = ?
+        ''', (user_id,)).fetchall()
+        return jsonify([dict(row) for row in accounts]), 200
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+# Add the account creation route
+@app.route('/api/accounts/create', methods=['POST'])
+def api_create_account():
+    data = request.get_json()
+    # Logic calls the new multi-table insertion function in social_db.py
+    result = social_db.create_account(data['user_id'], data['username'])
+    return jsonify(result), 201 if result["success"] else 400
 
 @app.route('/api/catchup', methods=['GET'])
 def api_get_catchup_feed():

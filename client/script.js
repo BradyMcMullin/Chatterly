@@ -11,19 +11,64 @@ createApp({
     const isSubmitting = ref(false);
     const allAccounts = ref([]);
 
-    const fetchAccounts = async () => {
-        const response = await fetch('http://127.0.0.1:5000/api/accounts');
-        allAccounts.value = await response.json();
-    };
-
     const getActiveUsername = computed(() => {
-        const active = allAccounts.value.find(a => a.account_id === currentAccountId.value);
-        return active ? active.username : 'User';
-    });
+      // Find the account object that matches the current ID
+      const activeAcc = allAccounts.value.find(acc => acc.account_id === currentAccountId.value);
+      
+      // If it exists, return the handle; otherwise, return a placeholder
+      return activeAcc ? activeAcc.handle : "Guest";
+  });
 
     const isOwnProfile = computed(() => {
       return currentAccountId.value === targetAccountId.value;
     });
+
+    const currentUserId = ref(1); // Hardcoded for Alice
+
+    const fetchAccounts = async () => {
+        // URL now matches the new Flask route
+        const response = await fetch(`http://127.0.0.1:5000/api/accounts/${currentUserId.value}`);
+        allAccounts.value = await response.json();
+        
+        if (allAccounts.value.length > 0 && !currentAccountId.value) {
+            currentAccountId.value = allAccounts.value[0].account_id;
+        }
+    };
+    
+    const handleAccountChange = async () => {
+        if (currentAccountId.value === 'NEW_ACCOUNT') {
+            const newName = prompt("Enter a name for your new account:");
+            if (newName) {
+                await createNewAccount(newName);
+            } else {
+                // Revert selection if cancelled
+                currentAccountId.value = allAccounts.value[0]?.account_id;
+            }
+        } else {
+            await fetchFeed();
+        }
+    };
+
+    const createNewAccount = async (username) => {
+      try {
+          const response = await fetch('http://127.0.0.1:5000/api/accounts/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  user_id: 1, // Alice's hardcoded ID
+                  username: username 
+              })
+          });
+          const result = await response.json();
+          if (result.success) {
+              await fetchAccounts(); // Refresh list
+              currentAccountId.value = result.account_id; // Switch to new account
+              await fetchFeed();
+          }
+      } catch (error) {
+          console.error("Failed to create account:", error);
+      }
+    };
     
     const showProfileModal = ref(false);
     const profileData = ref({ bio: '', age: '', username: '' });
@@ -165,6 +210,7 @@ createApp({
       formatDate,
       // ADD THESE NEW ENTRIES:
       openProfile,
+      handleAccountChange,
       showProfileModal,
       profileData,
       isOwnProfile,

@@ -14,6 +14,7 @@ CREATE TABLE users(
 CREATE TABLE accounts(
   account_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
+  handle TEXT NOT NULL UNIQUE, -- Add this column
   follower_count INTEGER DEFAULT 0,
   following_count INTEGER DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -31,7 +32,7 @@ CREATE TABLE profile_info (
 CREATE TABLE profiles (
   profile_id INTEGER PRIMARY KEY AUTOINCREMENT,
   account_id INTEGER NOT NULL UNIQUE,
-  info_id INTEGER NOT NULL UNIQUE,
+  info_id INTEGER NOT NULL UNIQUE, -- This enforces the 1:1 relationship
   FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE,
   FOREIGN KEY (info_id) REFERENCES profile_info(info_id) ON DELETE CASCADE
 );
@@ -148,37 +149,38 @@ END;
 -- SEED DATA (Test Data)
 -------------------------------------------------
 
--- 1. Create Users
-INSERT INTO users (email, username, first_name, last_name) VALUES 
-('alice@example.com', 'alice_wonder', 'Alice', 'Smith'),
-('bob@example.com', 'builder_bob', 'Bob', 'Jones'),
-('charlie@example.com', 'chuck_norris', 'Charlie', 'Brown');
+-- 1. Create 3 Users
+INSERT INTO users (user_id, email, username, first_name, last_name) VALUES 
+(1, 'alice@example.com', 'alice_wonder', 'Alice', 'Smith'),
+(2, 'bob@example.com', 'builder_bob', 'Bob', 'Jones'),
+(3, 'charlie@example.com', 'chuck_norris', 'Charlie', 'Brown');
 
--- 2. Create Accounts (Linking to the users we just made)
-INSERT INTO accounts (user_id) VALUES 
-(1), -- Account 1 belongs to Alice
-(2), -- Account 2 belongs to Bob
-(3); -- Account 3 belongs to Charlie
+-- 2. Create 4 Accounts (Alice has two: 1 and 4)
+INSERT INTO accounts (account_id, user_id, handle) VALUES 
+(1, 1, 'alice_main'),
+(2, 2, 'bob_builds'),
+(3, 3, 'charlie_prime'),
+(4, 1, 'alice_business');
 
--- 3. Create Followers 
--- (Because of your triggers, this will auto-update follower/following counts in accounts!)
-INSERT INTO followers (follower_id, followed_id) VALUES 
-(1, 2), -- Alice follows Bob
-(1, 3), -- Alice follows Charlie
-(2, 1); -- Bob follows Alice
+-- 3. Create 4 UNIQUE Profile Info rows (One for each account)
+INSERT INTO profile_info (info_id, bio, age) VALUES 
+(1, 'Personal account of Alice', 25),
+(2, 'Bob the Builder official', 30),
+(3, 'Charlie’s thoughts', 22),
+(4, 'Alice Business Inquiry', 25);
 
--- 4. Create Posts
+-- 4. Link them 1-to-1 (Ensure no info_id is repeated)
+INSERT INTO profiles (account_id, info_id) VALUES 
+(1, 1), 
+(2, 2), 
+(3, 3), 
+(4, 4);
+
+-- 5. Create Posts (Ensure account_id exists in the accounts table above)
 INSERT INTO posts (account_id, content) VALUES 
-(1, 'Hello world! This is my first post on this awesome new network.'),
-(2, 'Can anyone recommend a good database tutorial?'),
-(3, 'Just set up my new Flask backend. Feeling good!');
-
--- 5. Create Likes
--- (Because of your triggers, this will auto-update the like_count in posts!)
-INSERT INTO likes (post_id, account_id) VALUES 
-(1, 2), -- Bob likes Alice's post
-(1, 3), -- Charlie likes Alice's post
-(2, 1); -- Alice likes Bob's post
+(1, 'Hello world, this is my first post!'),
+(2, 'Can we fix it? Yes we can!'),
+(4, 'Open for business inquiries.');
 
 -- 6. Create Comments
 -- (Because of your triggers, this will auto-update the comment_count in posts!)
@@ -189,8 +191,3 @@ INSERT INTO comments (post_id, account_id, comment_content) VALUES
 INSERT INTO profile_info (bio, age) VALUES 
 ('Adventurer and tea drinker.', 25),
 ('I like building things with code!', 30);
-
--- 7. Link those info entries to the Accounts (Alice is ID 1, Bob is ID 2)
-INSERT INTO profiles (account_id, info_id) VALUES 
-(1, 1),
-(2, 2);

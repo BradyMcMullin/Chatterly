@@ -42,14 +42,14 @@
                         <div class="flex flex-col items-end">
                             <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Active User</span>
                             <select 
-                                v-model="currentAccountId" 
-                                @change="fetchFeed"
-                                class="bg-transparent text-sm font-bold text-gray-900 outline-none cursor-pointer hover:text-indigo-600 transition-colors appearance-none text-right"
-                            >
-                                <option v-for="acc in allAccounts" :key="acc.account_id" :value="acc.account_id">
-                                    @{{ acc.username }}
-                                </option>
-                            </select>
+                            v-model="currentAccountId" 
+                            @change="handleAccountChange"
+                            class="bg-transparent text-sm font-bold text-gray-900 outline-none cursor-pointer appearance-none text-right"
+                        >
+                            <option v-for="acc in allAccounts" :key="acc.account_id" :value="acc.account_id">
+                                @{{ acc.handle }} </option>
+                            <option value="NEW_ACCOUNT" class="text-indigo-600 font-bold">+ Add New Account</option>
+                        </select>
                             <div @click="openProfile(currentAccountId)" class="...">
                                 {{ getActiveUsername[0]?.toUpperCase() }}
                             </div>
