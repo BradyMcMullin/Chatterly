@@ -9,9 +9,9 @@ CORS(app)
 def api_create_user():
     data = request.get_json()
     result = social_db.create_user(
-        email = data['email'],          # <-- Added comma
-        username = data['username'],    # <-- Added comma
-        first_name = data.get('first_name', ''), # <-- Added comma
+        email = data['email'],
+        username = data['username'], 
+        first_name = data.get('first_name', ''),
         last_name = data.get('last_name','')
     )
 
@@ -22,15 +22,39 @@ def api_create_user():
 
 @app.route('/api/feed/<int:account_id>', methods=['GET'])
 def api_get_feed(account_id):
-    feed = social_db.get_feed(account_id) 
+    feed = social_db.get_profile(account_id) 
     return jsonify(feed), 200
+
+@app.route('api/users/<int:account_id>', methods=['GET'])
+def api_get_account_info(account_id):
+    account = social_db.get_profile(account_id)
+    return jsonify(account), 200
+
+@app.route('api/users/<int:account_id', methods=['POST'])
+def api_add_profile_info(account_id, body):
+    account_info = {"first_name":"", "last_name":"", "creation_date":"", "bio":"", "age":""}
+    result = social_db.create_profile(
+        account_info
+    )
+    if result["success"]:
+        return jsonify(result), 201
+    else:
+        return jsonify(result), 400
+
+@app.route('api/account/<int:account_id', methods=['PUT'])
+def api_update_account_info(account_id, body):
+    current_info = api_get_account_info(account_id)
+    account_info = {"first_name":"", "last_name":"", "creation_date":"", "bio":"", "age":""}
+    
+
+
+
 @app.route('/api/catchup', methods=['GET'])
 def api_get_catchup_feed():
 	feed = social_db.get_catch_up_feed()
 	return jsonify(feed), 200
 
 
-@app.route('/api/posts', methods=['POST'])
 @app.route('/api/posts', methods=['POST'])
 def api_create_post():
     data = request.get_json()
