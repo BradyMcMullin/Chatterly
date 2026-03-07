@@ -58,3 +58,5 @@ def get_catch_up_feed(limit=10):
 	posts = conn.execute(query, (limit,)).fetchall()
 	conn.close()
 	return [dict(post) for post in posts]
+
+def get_profile
