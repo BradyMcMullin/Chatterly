@@ -1,20 +1,39 @@
-PRAGMA foreign_keys = ON; --For whatever reason, sqlite needs this explicitly told
+PRAGMA foreign_keys = ON;
 
+-- 1. Base Users Table
 CREATE TABLE users(
   user_id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
   username TEXT NOT NULL UNIQUE,
   first_name TEXT,
   last_name TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP --default will set the timestamp automatically :)
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 2. Accounts Table (Must be before Profiles and Triggers)
 CREATE TABLE accounts(
   account_id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   follower_count INTEGER DEFAULT 0,
   following_count INTEGER DEFAULT 0,
-  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE -- delete cascade will remove any rows with account_id when account is deleted!
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- 3. Normalized Profile Info Table
+CREATE TABLE profile_info (
+  info_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bio TEXT DEFAULT '',
+  age INTEGER,
+  last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Profile Link Table (Links Accounts to Info)
+CREATE TABLE profiles (
+  profile_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL UNIQUE,
+  info_id INTEGER NOT NULL UNIQUE,
+  FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE,
+  FOREIGN KEY (info_id) REFERENCES profile_info(info_id) ON DELETE CASCADE
 );
 
 CREATE TABLE followers(
@@ -166,3 +185,12 @@ INSERT INTO likes (post_id, account_id) VALUES
 INSERT INTO comments (post_id, account_id, comment_content) VALUES 
 (1, 2, 'Welcome to the platform, Alice!'),
 (2, 3, 'Check out the SQLite documentation, it is great.');
+
+INSERT INTO profile_info (bio, age) VALUES 
+('Adventurer and tea drinker.', 25),
+('I like building things with code!', 30);
+
+-- 7. Link those info entries to the Accounts (Alice is ID 1, Bob is ID 2)
+INSERT INTO profiles (account_id, info_id) VALUES 
+(1, 1),
+(2, 2);

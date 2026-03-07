@@ -59,4 +59,38 @@ def get_catch_up_feed(limit=10):
 	conn.close()
 	return [dict(post) for post in posts]
 
-def get_profile
+def get_profile(account_id):
+    conn = get_db_connection()
+    query = """
+        SELECT u.username, u.first_name, u.last_name, pi.bio, pi.age
+        FROM accounts a
+        JOIN users u ON a.user_id = u.user_id
+        LEFT JOIN profiles p ON a.account_id = p.account_id
+        LEFT JOIN profile_info pi ON p.info_id = pi.info_id
+        WHERE a.account_id = ?
+    """
+    profile = conn.execute(query, (account_id,)).fetchone()
+    conn.close()
+    return dict(profile) if profile else None
+
+def update_profile(account_id, bio, age):
+    conn = get_db_connection()
+    try:
+        # 1. Check if a profile link already exists
+        res = conn.execute("SELECT info_id FROM profiles WHERE account_id = ?", (account_id,)).fetchone()
+        
+        if res:
+            # 2. Update existing info
+            conn.execute("UPDATE profile_info SET bio = ?, age = ? WHERE info_id = ?", (bio, age, res['info_id']))
+        else:
+            # 3. Create new info entry and link it
+            cursor = conn.execute("INSERT INTO profile_info (bio, age) VALUES (?, ?)", (bio, age))
+            new_info_id = cursor.lastrowid
+            conn.execute("INSERT INTO profiles (account_id, info_id) VALUES (?, ?)", (account_id, new_info_id))
+            
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()

@@ -22,15 +22,16 @@ def api_create_user():
 
 @app.route('/api/feed/<int:account_id>', methods=['GET'])
 def api_get_feed(account_id):
-    feed = social_db.get_profile(account_id) 
+    # Change get_profile to get_feed
+    feed = social_db.get_feed(account_id) 
     return jsonify(feed), 200
 
-@app.route('api/users/<int:account_id>', methods=['GET'])
+@app.route('/api/users/<int:account_id>', methods=['GET'])
 def api_get_account_info(account_id):
     account = social_db.get_profile(account_id)
     return jsonify(account), 200
 
-@app.route('api/users/<int:account_id', methods=['POST'])
+@app.route('/api/users/<int:account_id>', methods=['POST'])
 def api_add_profile_info(account_id, body):
     account_info = {"first_name":"", "last_name":"", "creation_date":"", "bio":"", "age":""}
     result = social_db.create_profile(
@@ -41,13 +42,28 @@ def api_add_profile_info(account_id, body):
     else:
         return jsonify(result), 400
 
-@app.route('api/account/<int:account_id', methods=['PUT'])
-def api_update_account_info(account_id, body):
-    current_info = api_get_account_info(account_id)
-    account_info = {"first_name":"", "last_name":"", "creation_date":"", "bio":"", "age":""}
+@app.route('/api/profile/<int:account_id>', methods=['POST'])
+def api_update_profile(account_id):
+    data = request.get_json()
+    # Extract values from the frontend request
+    result = social_db.update_profile(
+        account_id, 
+        data.get('bio', ''), 
+        data.get('age', '')
+    )
+    return jsonify(result), (200 if result["success"] else 400)
     
-
-
+@app.route('/api/accounts', methods=['GET'])
+def api_get_all_accounts():
+    conn = social_db.get_db_connection()
+    # This matches the structure of your accounts/users tables
+    accounts = conn.execute('''
+        SELECT a.account_id, u.username, u.first_name 
+        FROM accounts a 
+        JOIN users u ON a.user_id = u.user_id
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in accounts]), 200
 
 @app.route('/api/catchup', methods=['GET'])
 def api_get_catchup_feed():

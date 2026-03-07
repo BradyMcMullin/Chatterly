@@ -1,5 +1,5 @@
 // script.js
-const { createApp, ref, onMounted, toRaw } = Vue; // Added toRaw here
+const { createApp, ref, onMounted, toRaw, computed } = Vue;
 
 createApp({
   setup() {
@@ -9,6 +9,63 @@ createApp({
     const newPostContent = ref(""); 
     const currentAccountId = ref(1); 
     const isSubmitting = ref(false);
+    const allAccounts = ref([]);
+
+    const fetchAccounts = async () => {
+        const response = await fetch('http://127.0.0.1:5000/api/accounts');
+        allAccounts.value = await response.json();
+    };
+
+    const getActiveUsername = computed(() => {
+        const active = allAccounts.value.find(a => a.account_id === currentAccountId.value);
+        return active ? active.username : 'User';
+    });
+
+    const isOwnProfile = computed(() => {
+      return currentAccountId.value === targetAccountId.value;
+    });
+    
+    const showProfileModal = ref(false);
+    const profileData = ref({ bio: '', age: '', username: '' });
+
+    const targetAccountId = ref(null);
+
+    const openProfile = async (id) => {
+      // If no ID is passed (unlikely now), default to current user
+      const targetId = id || currentAccountId.value;
+      targetAccountId.value = targetId; 
+      
+      try {
+          const response = await fetch(`http://127.0.0.1:5000/api/users/${targetId}`);
+          const data = await response.json();
+          // Fallback for bio/age if they are null in the DB
+          profileData.value = {
+              ...data,
+              bio: data.bio || '',
+              age: data.age || ''
+          };
+          showProfileModal.value = true;
+      } catch (error) {
+          console.error("Failed to load profile:", error);
+      }
+  };
+
+    const saveProfile = async () => {
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/profile/${currentAccountId.value}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bio: profileData.value.bio,
+                    age: profileData.value.age
+                })
+            });
+            const result = await response.json();
+            if (result.success) showProfileModal.value = false;
+        } catch (error) {
+            console.error("Save failed:", error);
+        }
+    };
 
     // 1. Fetch data from your Flask API
     const fetchFeed = async () => {
@@ -83,16 +140,35 @@ createApp({
     };
 
     // Initialize
-    onMounted(fetchFeed);
+    onMounted(async () => {
+      // Run both calls. If fetchAccounts 404s, fetchFeed will still try to run.
+      try {
+          await fetchAccounts();
+      } catch (e) {
+          console.error("Account list failed to load (Check Flask route /api/accounts)");
+      }
+      
+      await fetchFeed();
+    });
 
     return {
-      posts,
-      loading,
-      showModal,
-      newPostContent,
+      posts, 
+      loading, 
+      showModal, 
+      newPostContent, 
+      currentAccountId,
+      allAccounts, 
+      getActiveUsername, 
       isSubmitting,
-      submitPost,
-      formatDate
+      fetchFeed, 
+      submitPost, 
+      formatDate,
+      // ADD THESE NEW ENTRIES:
+      openProfile,
+      showProfileModal,
+      profileData,
+      isOwnProfile,
+      saveProfile
     };
   } // This was the missing setup brace!
 }).mount('#app');
