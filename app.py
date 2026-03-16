@@ -53,6 +53,11 @@ def api_update_profile(account_id):
         data.get('age', '')
     )
     return jsonify(result), (200 if result["success"] else 400)
+
+@app.route('/api/accounts/<int:account_id>/activity', methods=['GET'])
+def api_get_activity(account_id):
+    activity = social_db.get_account_activity(account_id)
+    return jsonify(activity), 200
     
 @app.route('/api/accounts', methods=['GET'])
 def api_get_all_accounts():
@@ -65,6 +70,18 @@ def api_get_all_accounts():
     ''').fetchall()
     conn.close()
     return jsonify([dict(row) for row in accounts]), 200
+
+@app.route('/api/posts/<int:post_id>/like', methods=['POST'])
+def api_toggle_like(post_id):
+    data = request.get_json()
+    result = social_db.toggle_like(data['account_id'], post_id)
+    return jsonify(result), 200
+
+@app.route('/api/posts/<int:post_id>/comment', methods=['POST'])
+def api_add_comment(post_id):
+    data = request.get_json()
+    result = social_db.add_comment(data['account_id'], post_id, data['content'])
+    return jsonify(result), 201
 
 @app.route('/api/accounts/<int:user_id>', methods=['GET'])
 def api_get_my_accounts(user_id):

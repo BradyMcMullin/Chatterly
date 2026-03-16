@@ -49,6 +49,44 @@ createApp({
         }
     };
 
+    const toggleLike = async (postId) => {
+      await fetch(`http://127.0.0.1:5000/api/posts/${postId}/like`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: currentAccountId.value })
+      });
+      await fetchFeed(); // Refresh to see new like count
+    };
+  
+    const submitComment = async (postId) => {
+      const commentText = prompt("Write your reply:");
+      if (!commentText || !commentText.trim()) return;
+  
+      try {
+          const response = await fetch(`http://127.0.0.1:5000/api/posts/${postId}/comment`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  account_id: currentAccountId.value,
+                  content: commentText.trim() 
+              })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+              // Give the DB a split second to breathe, then refresh
+              setTimeout(async () => {
+                  await fetchFeed();
+              }, 100); 
+          } else {
+              alert("Error posting comment: " + result.error);
+          }
+      } catch (error) {
+          console.error("Failed to post comment:", error);
+      }
+  };
+
     const createNewAccount = async (username) => {
       try {
           const response = await fetch('http://127.0.0.1:5000/api/accounts/create', {
@@ -74,25 +112,25 @@ createApp({
     const profileData = ref({ bio: '', age: '', username: '' });
 
     const targetAccountId = ref(null);
+    const accountActivity = ref([]);
 
     const openProfile = async (id) => {
-      // If no ID is passed (unlikely now), default to current user
-      const targetId = id || currentAccountId.value;
-      targetAccountId.value = targetId; 
-      
-      try {
-          const response = await fetch(`http://127.0.0.1:5000/api/users/${targetId}`);
-          const data = await response.json();
-          // Fallback for bio/age if they are null in the DB
-          profileData.value = {
-              ...data,
-              bio: data.bio || '',
-              age: data.age || ''
-          };
-          showProfileModal.value = true;
-      } catch (error) {
-          console.error("Failed to load profile:", error);
-      }
+        const targetId = id || currentAccountId.value;
+        targetAccountId.value = targetId; 
+        
+        try {
+            // Fetch profile info (Bio/Age)
+            const profileRes = await fetch(`http://127.0.0.1:5000/api/users/${targetId}`);
+            profileData.value = await profileRes.json();
+            
+            // Fetch liked/commented activity
+            const activityRes = await fetch(`http://127.0.0.1:5000/api/accounts/${targetId}/activity`);
+            accountActivity.value = await activityRes.json();
+            
+            showProfileModal.value = true;
+        } catch (error) {
+            console.error("Failed to load profile details:", error);
+        }
   };
 
     const saveProfile = async () => {
@@ -208,13 +246,15 @@ createApp({
       fetchFeed, 
       submitPost, 
       formatDate,
-      // ADD THESE NEW ENTRIES:
       openProfile,
       handleAccountChange,
+      accountActivity,
       showProfileModal,
       profileData,
       isOwnProfile,
-      saveProfile
+      saveProfile,
+      toggleLike,
+      submitComment
     };
   } // This was the missing setup brace!
 }).mount('#app');

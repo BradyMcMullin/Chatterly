@@ -69,7 +69,8 @@ CREATE TABLE comments(
   comment_id INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id INTEGER NOT NULL,
   account_id INTEGER NOT NULL,
-  comment_content TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (post_id) REFERENCES posts(post_id) ON DELETE CASCADE,
   FOREIGN KEY (account_id) REFERENCES accounts(account_id) ON DELETE CASCADE
 );
@@ -184,7 +185,7 @@ INSERT INTO posts (account_id, content) VALUES
 
 -- 6. Create Comments
 -- (Because of your triggers, this will auto-update the comment_count in posts!)
-INSERT INTO comments (post_id, account_id, comment_content) VALUES 
+INSERT INTO comments (post_id, account_id, content) VALUES 
 (1, 2, 'Welcome to the platform, Alice!'),
 (2, 3, 'Check out the SQLite documentation, it is great.');
 
