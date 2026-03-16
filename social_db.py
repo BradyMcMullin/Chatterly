@@ -25,6 +25,38 @@ def create_user(email, username, first_name="", last_name=""):
         conn.close()
 
 
+def delete_user(user_id):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM users WHERE user_id = ?",
+            (user_id,),
+        )
+        conn.commit()
+        return {"success": True, "user_id": cursor.lastrowid}
+    except sqlite3.IntegrityError:
+        return {"success": False, "error": "user doesn't exist"}
+    finally:
+        conn.close()
+
+
+def delete_account(account_id):
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM accounts WHERE account_id = ?",
+            (account_id,),
+        )
+        conn.commit()
+        return {"success": True, "account_id": cursor.lastrowid}
+    except sqlite3.IntegrityError:
+        return {"success": False, "error": "account doesn't exist"}
+    finally:
+        conn.close()
+
+
 def get_feed(account_id):
     conn = get_db_connection()
     # Updated query to include your own posts
@@ -44,9 +76,10 @@ def get_feed(account_id):
     conn.close()
     return [dict(post) for post in posts]
 
+
 def get_catch_up_feed(limit=10):
-	conn = get_db_connection()
-	query = """
+    conn = get_db_connection()
+    query = """
 	    SELECT p.*, u.username
 	    FROM posts p
 	    JOIN accounts a ON p.account_id = a.account_id
@@ -55,6 +88,6 @@ def get_catch_up_feed(limit=10):
 	    ORDER BY p.like_count DESC, p.comment_count DESC, p.created_at DESC
 	    LIMIT ?;
 	"""
-	posts = conn.execute(query, (limit,)).fetchall()
-	conn.close()
-	return [dict(post) for post in posts]
+    posts = conn.execute(query, (limit,)).fetchall()
+    conn.close()
+    return [dict(post) for post in posts]
