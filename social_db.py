@@ -108,7 +108,7 @@ def get_profile(account_id):
 
 def get_account_activity(account_id):
     conn = get_db_connection()
-    # Use UNION to find posts that are either liked OR commented on
+    # This query finds posts linked to the user via likes OR comments
     query = """
         SELECT DISTINCT p.post_id, p.content, p.created_at, a.handle as username
         FROM posts p

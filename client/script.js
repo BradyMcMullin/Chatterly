@@ -85,7 +85,7 @@ createApp({
       } catch (error) {
           console.error("Failed to post comment:", error);
       }
-  };
+    };
 
     const createNewAccount = async (username) => {
       try {
