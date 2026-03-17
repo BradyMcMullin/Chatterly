@@ -174,5 +174,3 @@ BEGIN
   SET following_count = following_count - 1
   WHERE account_id = OLD.follower_id;
 END;
-
-
