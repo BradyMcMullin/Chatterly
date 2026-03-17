@@ -130,6 +130,11 @@ def api_get_catchup_feed():
     feed = social_db.get_catch_up_feed()
     return jsonify(feed), 200
 
+@app.route("/api/ghosts/<int:account_id>", methods=["GET"])
+def api_get_ghost_followers(account_id):
+    limit = request.args.get("limit", default=10, type=int)
+    ghosts = social_db.get_ghost_followers(account_id, limit)
+    return jsonify(ghosts), 200
 
 @app.route("/api/posts", methods=["POST"])
 def api_create_post():
