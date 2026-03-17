@@ -44,9 +44,10 @@ def get_feed(account_id):
     conn.close()
     return [dict(post) for post in posts]
 
+
 def get_catch_up_feed(limit=10):
-	conn = get_db_connection()
-	query = """
+    conn = get_db_connection()
+    query = """
 	    SELECT p.*, u.username
 	    FROM posts p
 	    JOIN accounts a ON p.account_id = a.account_id
@@ -55,6 +56,26 @@ def get_catch_up_feed(limit=10):
 	    ORDER BY p.like_count DESC, p.comment_count DESC, p.created_at DESC
 	    LIMIT ?;
 	"""
-	posts = conn.execute(query, (limit,)).fetchall()
-	conn.close()
-	return [dict(post) for post in posts]
+    posts = conn.execute(query, (limit,)).fetchall()
+    conn.close()
+    return [dict(post) for post in posts]
+
+
+def get_ghost_followers(account_id, limit=10):
+    conn = get_db_connection()
+    query = """
+        SELECT a.account_id, u.username, MAX(p.created_at) AS last_like_at
+        FROM followers f
+        JOIN accounts a ON a.account_id = f.follower_id
+        JOIN users u ON u.user_id = a.user_id
+        LEFT JOIN likes l ON l.account_id = f.follower_id
+        LEFT JOIN posts p ON p.post_id = l.post_id
+        WHERE f.followed_id = ?
+        GROUP BY a.account_id, u.username
+        HAVING last_like_at IS NULL OR last_like_at < datetime('now', '-90 days')
+        ORDER BY COALESCE(last_like_at, '1970-01-01') ASC, u.username ASC
+        LIMIT ?;
+    """
+    followers = conn.execute(query, (account_id, limit)).fetchall()
+    conn.close()
+    return [dict(follower) for follower in followers]
