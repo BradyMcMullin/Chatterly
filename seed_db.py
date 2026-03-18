@@ -62,25 +62,20 @@ def seed_database():
     cursor = conn.cursor()
 
     # 1. Generate Users & Accounts
-    user_ids = []
     account_ids = []
-
-    for i in range(15):
+    for i in range(25):  # Bumped up to 25 to ensure a good list of ghosts
         fn = random.choice(FIRST_NAMES)
         ln = random.choice(LAST_NAMES)
-        username = f"{fn.lower()}_{ln.lower()}_{random.randint(100, 999)}"
+        username = f"{fn.lower()}_{ln.lower()}_{random.randint(100, 9999)}"
         email = f"{username}@example.com"
 
         try:
-            # Insert User
             cursor.execute(
                 "INSERT INTO users (email, username, first_name, last_name) VALUES (?, ?, ?, ?)",
                 (email, username, fn, ln),
             )
             user_id = cursor.lastrowid
-            user_ids.append(user_id)
 
-            # Insert Account for User
             handle = f"{fn.lower()}{random.randint(10, 99)}"
             cursor.execute(
                 "INSERT INTO accounts (user_id, handle) VALUES (?, ?)",
@@ -89,7 +84,6 @@ def seed_database():
             account_id = cursor.lastrowid
             account_ids.append(account_id)
 
-            # Insert Profile Info
             bio = random.choice(BIOS)
             age = random.randint(18, 25)
             cursor.execute(
@@ -97,22 +91,33 @@ def seed_database():
             )
             info_id = cursor.lastrowid
 
-            # Link Profile
             cursor.execute(
                 "INSERT INTO profiles (account_id, info_id) VALUES (?, ?)",
                 (account_id, info_id),
             )
-
         except sqlite3.IntegrityError:
-            continue  # Skip if random generation causes a duplicate email/username
+            continue
 
     print(f"✅ Created {len(account_ids)} accounts.")
 
+    # --- GHOST FEATURE SETUP ---
+    # We will make Account 1 our "Main Target". Everyone follows Account 1.
+    target_account = account_ids[0]
+    ghost_accounts = account_ids[1:11]  # 10 accounts will be ghosts
+    active_accounts = account_ids[11:]  # The rest are active
+
     # 2. Generate Follows
-    for acc_id in account_ids:
-        # Each account follows 3 to 7 random people
+    for acc_id in account_ids[1:]:
+        # Everyone follows the target account so we have a reliable dataset to test
+        cursor.execute(
+            "INSERT INTO followers (follower_id, followed_id) VALUES (?, ?)",
+            (acc_id, target_account),
+        )
+
+        # Plus some random follows for network realism
         follows = random.sample(
-            [a for a in account_ids if a != acc_id], random.randint(3, 7)
+            [a for a in account_ids if a != acc_id and a != target_account],
+            random.randint(1, 4),
         )
         for followed_id in follows:
             try:
@@ -123,44 +128,73 @@ def seed_database():
             except sqlite3.IntegrityError:
                 pass
 
-    print("✅ Created follow network.")
+    print("✅ Created follow network (Everyone follows Account 1).")
 
-    # 3. Generate Posts
-    post_ids = []
-    for _ in range(40):
+    # 3. Generate Posts (Old vs Recent)
+    old_post_ids = []
+    recent_post_ids = []
+
+    for _ in range(60):
         acc_id = random.choice(account_ids)
         content = random.choice(POSTS)
 
-        # Randomize creation time over the last 7 days for the catch-up feed
-        random_days_ago = random.randint(0, 6)
-        random_hours_ago = random.randint(0, 23)
-        created_at = (
-            datetime.now() - timedelta(days=random_days_ago, hours=random_hours_ago)
-        ).strftime("%Y-%m-%d %H:%M:%S")
+        # Flip a coin: Make an old post (> 90 days) or a recent post (< 7 days)
+        is_old = random.choice([True, False])
 
-        cursor.execute(
-            "INSERT INTO posts (account_id, content, created_at) VALUES (?, ?, ?)",
-            (acc_id, content, created_at),
-        )
-        post_ids.append(cursor.lastrowid)
+        if is_old:
+            days_ago = random.randint(100, 150)  # Definitely older than 90 days
+            created_at = (datetime.now() - timedelta(days=days_ago)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            cursor.execute(
+                "INSERT INTO posts (account_id, content, created_at) VALUES (?, ?, ?)",
+                (acc_id, content, created_at),
+            )
+            old_post_ids.append(cursor.lastrowid)
+        else:
+            days_ago = random.randint(0, 6)  # Recent
+            created_at = (datetime.now() - timedelta(days=days_ago)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            cursor.execute(
+                "INSERT INTO posts (account_id, content, created_at) VALUES (?, ?, ?)",
+                (acc_id, content, created_at),
+            )
+            recent_post_ids.append(cursor.lastrowid)
 
-    print(f"✅ Created {len(post_ids)} posts.")
+    print(
+        f"✅ Created {len(old_post_ids)} old posts and {len(recent_post_ids)} recent posts."
+    )
 
-    # 4. Generate Likes and Comments
-    for post_id in post_ids:
-        # Random Likes
-        likers = random.sample(account_ids, random.randint(0, 8))
-        for liker_id in likers:
+    # 4. Generate Likes (The critical part for ghosts)
+    # Ghosts ONLY like old posts (or nothing at all)
+    for ghost in ghost_accounts:
+        if random.choice([True, False]):  # 50% chance they haven't liked ANYTHING EVER
+            liked_posts = random.sample(old_post_ids, random.randint(1, 3))
+            for post_id in liked_posts:
+                try:
+                    cursor.execute(
+                        "INSERT INTO likes (account_id, post_id) VALUES (?, ?)",
+                        (ghost, post_id),
+                    )
+                except sqlite3.IntegrityError:
+                    pass
+
+    # Active users like recent posts (preventing them from being ghosts)
+    for active in active_accounts:
+        liked_posts = random.sample(recent_post_ids, random.randint(3, 8))
+        for post_id in liked_posts:
             try:
                 cursor.execute(
                     "INSERT INTO likes (account_id, post_id) VALUES (?, ?)",
-                    (liker_id, post_id),
+                    (active, post_id),
                 )
             except sqlite3.IntegrityError:
                 pass
 
-        # Random Comments
-        for _ in range(random.randint(0, 4)):
+    # Add some random comments just to flesh things out
+    for post_id in recent_post_ids + old_post_ids:
+        if random.random() > 0.5:
             commenter_id = random.choice(account_ids)
             content = random.choice(COMMENTS)
             cursor.execute(
@@ -168,11 +202,10 @@ def seed_database():
                 (commenter_id, post_id, content),
             )
 
-    print("✅ Added likes and comments.")
+    print("✅ Added targeted likes to create Ghost vs Active users.")
 
     conn.commit()
     conn.close()
-    print("🎉 Database successfully seeded! You are ready to present.")
 
 
 if __name__ == "__main__":
