@@ -10,6 +10,7 @@ createApp({
     const currentAccountId = ref(1); 
     const isSubmitting = ref(false);
     const allAccounts = ref([]);
+    const currentView = ref('personal');
 
     const getActiveUsername = computed(() => {
       // Find the account object that matches the current ID
@@ -177,6 +178,50 @@ createApp({
       }
   };
 
+  const handleEditPost = async (post) => {
+    const newContent = prompt("Edit your post:", post.content);
+    if (!newContent || newContent === post.content) return;
+
+    try {
+        const response = await fetch(`http://127.0.0.1:5000/api/posts/${post.post_id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                account_id: currentAccountId.value, 
+                content: newContent 
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            post.content = newContent; // Update UI instantly without a full reload
+        }
+    } catch (e) {
+        console.error("Edit post failed", e);
+    }
+};
+
+const handleEditComment = async (comment) => {
+    const newContent = prompt("Edit your reply:", comment.content);
+    if (!newContent || newContent === comment.content) return;
+
+    try {
+        const response = await fetch(`http://127.0.0.1:5000/api/comments/${comment.comment_id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                account_id: currentAccountId.value, 
+                content: newContent 
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            comment.content = newContent;
+        }
+    } catch (e) {
+        console.error("Edit comment failed", e);
+    }
+};
+
     const toggleLike = async (postId) => {
       await fetch(`http://127.0.0.1:5000/api/posts/${postId}/like`, {
           method: 'POST',
@@ -216,11 +261,15 @@ createApp({
     };
 
     const fetchCatchUp = async () => {
-      loading.value = true;
-      const response = await fetch('http://127.0.0.1:5000/api/catchup');
-      posts.value = await response.json();
-      loading.value = false;
-  };
+        loading.value = true;
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/catchup');
+            posts.value = await response.json();
+            currentView.value = 'trending'; // Update state to trending
+        } finally {
+            loading.value = false;
+        }
+    };
   
   const fetchGhosts = async () => {
       const response = await fetch(`http://127.0.0.1:5000/api/ghosts/${currentAccountId.value}`);
@@ -303,9 +352,9 @@ createApp({
         }
     };
 
-    // 1. Fetch data from your Flask API
     const fetchFeed = async () => {
       loading.value = true;
+      currentView.value = 'personal';
       const id = currentAccountId.value;
       try {
         const response = await fetch(`http://127.0.0.1:5000/api/feed/${id}`);
@@ -328,7 +377,6 @@ createApp({
       }
     };
 
-    // 2. Formatting helper
     const formatDate = (dateString) => {
       if (!dateString) return '';
       const date = new Date(dateString);
@@ -340,7 +388,6 @@ createApp({
       });
     };
 
-    // 3. Submit a new post
     const submitPost = async () => {
       isSubmitting.value = true;
       
@@ -375,7 +422,20 @@ createApp({
       }
     };
 
-    // Initialize
+    const getAvatarStyle = (username) => {
+        if (!username) return 'background-color: #cbd5e1'; // Default gray
+        
+        // Generate a unique hash from the username
+        let hash = 0;
+        for (let i = 0; i < username.length; i++) {
+            hash = username.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        // Use HSL for vibrant, consistent colors (Saturation 70%, Lightness 60%)
+        const hue = Math.abs(hash % 360);
+        return `background-color: hsl(${hue}, 70%, 60%); color: white;`;
+    };
+
     onMounted(async () => {
       // Run both calls. If fetchAccounts 404s, fetchFeed will still try to run.
       try {
@@ -388,37 +448,41 @@ createApp({
     });
 
     return {
-      posts, 
-      loading, 
-      showModal, 
-      newPostContent, 
-      currentAccountId,
-      allAccounts, 
-      getActiveUsername, 
-      isSubmitting,
-      searchQuery,
-      searchResults,
-      handleSearch,
-      selectUser,
-      fetchFeed, 
-      submitPost, 
-      formatDate,
-      openProfile,
-      handleAccountChange,
-      handleFollow,
-      handleFollowFromModal,
-      handleBlock,
-      handleDeleteComment,
-      handleDeletePost,
-      accountActivity,
-      showProfileModal,
-      profileData,
-      isOwnProfile,
-      fetchCatchUp,
-      fetchGhosts,
-      saveProfile,
-      toggleLike,
-      submitComment
+        posts, 
+        loading, 
+        showModal, 
+        newPostContent, 
+        currentAccountId,
+        allAccounts, 
+        currentView,
+        getActiveUsername, 
+        isSubmitting,
+        searchQuery,
+        searchResults,
+        handleSearch,
+        selectUser,
+        fetchFeed, 
+        submitPost, 
+        formatDate,
+        openProfile,
+        handleAccountChange,
+        handleFollow,
+        handleFollowFromModal,
+        handleBlock,
+        handleDeleteComment,
+        handleDeletePost,
+        handleEditComment,
+        handleEditPost,
+        accountActivity,
+        showProfileModal,
+        profileData,
+        isOwnProfile,
+        fetchCatchUp,
+        fetchGhosts,
+        saveProfile,
+        toggleLike,
+        submitComment,
+        getAvatarStyle
     };
-  } // This was the missing setup brace!
+} // This was the missing setup brace!
 }).mount('#app');
