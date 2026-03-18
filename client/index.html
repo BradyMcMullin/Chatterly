@@ -35,9 +35,17 @@
       <div v-else class="min-h-screen">
           <nav class="bg-white border-b p-4 sticky top-0 z-50">
             <div class="flex gap-4 mb-6">
-                <button @click="fetchCatchUp" class="flex-1 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold hover:bg-amber-100 transition">
-                    🔥 What's Trending? (Last 7 Days)
-                </button>
+                <button 
+                @click="currentView === 'trending' ? fetchFeed() : fetchCatchUp()"
+                class="flex-1 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold hover:bg-amber-100 transition"
+                :class="currentView === 'trending' 
+                    ? 'flex-1 p-3 bg-white-50 border border-amber-200 rounded-xl text-green-700 text-xs font-bold hover:bg-amber-100 transition' 
+                    : 'bg-white text-indigo-600 border border-white-100 hover:bg-yellow-50'"
+            >
+                <span>
+                    {{ currentView === 'trending' ? '🏠 Back to My Feed' : '🔥 What\'s Trending' }}
+                </span>
+            </button>
                 
                 <button @click="fetchGhosts" class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-100 transition">
                     👻 View Ghost Followers
@@ -80,11 +88,13 @@
                                 @{{ acc.handle }} </option>
                             <option value="NEW_ACCOUNT" class="text-indigo-600 font-bold">+ Add New Account</option>
                         </select>
-                            <div @click="openProfile(currentAccountId)" class="...">
-                                {{ getActiveUsername[0]?.toUpperCase() }}
-                            </div>
-                        </div>
-                        
+                            <div 
+                            @click="openProfile(currentAccountId.value)" 
+                            :style="getAvatarStyle(getActiveUsername)"
+                            class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-sm cursor-pointer border-2 border-white ring-1 ring-indigo-100 hover:scale-105 transition-transform"
+                        >
+                            {{ getActiveUsername ? getActiveUsername[0].toUpperCase() : '?' }}
+                            </div>                        
                     </div>
                     
                     <button @click="showModal = true" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all active:scale-95">
@@ -181,7 +191,9 @@
                             >
                             <span class="text-xs">Delete Post</span>
                             </button>
-                            
+                            <div v-if="post.account_id === currentAccountId" class="flex gap-2">
+                                <button @click="handleEditPost(post)" class="text-xs text-indigo-400 hover:text-indigo-600">Edit</button>
+                            </div>
                             <button 
                             v-if="post.account_id !== currentAccountId"
                             @click="handleFollow(post)"
@@ -214,29 +226,34 @@
                 </div>
         
                 <div v-if="post.comments && post.comments.length > 0" class="mt-4 ml-6 space-y-3 border-l-2 border-indigo-50 pl-4">
-                    <div v-for="comment in post.comments" :key="comment.comment_id" class="flex items-start space-x-2">
+                    <div v-for="comment in post.comments" :key="comment.comment_id" class="flex items-start space-x-2 group">
                         <div class="w-6 h-6 rounded-full bg-indigo-50 flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-indigo-400">
                             {{ comment.username[0].toUpperCase() }}
                         </div>
+                
                         <div class="bg-gray-50 p-2 rounded-xl flex-1">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-[11px] font-bold text-gray-900">@{{ comment.username }}</span>
-                                <span class="text-[9px] text-gray-400">{{ formatDate(comment.created_at) }}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[9px] text-gray-400">{{ formatDate(comment.created_at) }}</span>
+                                    
+                                    <button 
+                                        v-if="comment.account_id === currentAccountId"
+                                        @click="handleEditComment(comment)"
+                                        class="opacity-0 group-hover:opacity-100 text-[9px] text-indigo-400 hover:text-indigo-600 transition"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button 
+                                        v-if="comment.account_id === currentAccountId || post.account_id === currentAccountId"
+                                        @click="handleDeleteComment(comment.comment_id, post.post_id)"
+                                        class="opacity-0 group-hover:opacity-100 text-[9px] text-red-400 hover:text-red-600 transition"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
                             <p class="text-xs text-gray-700 leading-snug">{{ comment.content }}</p>
-                            <div v-for="comment in post.comments" :key="comment.comment_id" class="group flex justify-between">
-                                <p class="text-xs text-gray-600">
-                                    <span class="font-bold">@{{ comment.username }}</span> {{ comment.content }}
-                                </p>
-                                
-                                <button 
-                                    v-if="comment.account_id === currentAccountId || post.account_id === currentAccountId"
-                                    @click="handleDeleteComment(comment.comment_id, post.post_id)"
-                                    class="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 transition"
-                                >
-                                    ✕
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
