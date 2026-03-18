@@ -25,6 +25,29 @@ createApp({
 
     const currentUserId = ref(1); // Hardcoded for Alice
 
+    const searchQuery = ref('');
+    const searchResults = ref([]);
+
+    const handleSearch = async () => {
+        if (searchQuery.value.length < 2) {
+            searchResults.value = [];
+            return;
+        }
+        
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/search?q=${searchQuery.value}`);
+            searchResults.value = await response.json();
+        } catch (e) {
+            console.error("Search failed", e);
+        }
+    };
+
+    const selectUser = (accountId) => {
+        openProfile(accountId);
+        searchQuery.value = '';
+        searchResults.value = [];
+    };
+
     const fetchAccounts = async () => {
         // URL now matches the new Flask route
         const response = await fetch(`http://127.0.0.1:5000/api/accounts/${currentUserId.value}`);
@@ -48,6 +71,111 @@ createApp({
             await fetchFeed();
         }
     };
+
+    const handleFollow = async (post) => {
+      try {
+          const response = await fetch('http://127.0.0.1:5000/api/follow', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  follower_id: currentAccountId.value, 
+                  followed_id: post.account_id 
+              })
+          });
+          const result = await response.json();
+          
+          if (result.success) {
+              // Update all posts by this author in the current feed
+              posts.value.forEach(p => {
+                  if (p.account_id === post.account_id) {
+                      p.is_followed = (result.status === 'followed');
+                  }
+              });
+          }
+      } catch (e) {
+          console.error("Follow toggle failed", e);
+      }
+    };
+
+    const handleFollowFromModal = async (profile) => {
+      try {
+          const response = await fetch('http://127.0.0.1:5000/api/follow', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  follower_id: currentAccountId.value, 
+                  followed_id: profile.account_id 
+              })
+          });
+          const result = await response.json();
+          
+          if (result.success) {
+              // Update the modal's local state
+              profile.is_followed = (result.status === 'followed');
+              
+              // Sync the feed in the background so the buttons match
+              posts.value.forEach(p => {
+                  if (p.account_id === profile.account_id) {
+                      p.is_followed = profile.is_followed;
+                  }
+              });
+          }
+      } catch (e) {
+          console.error("Modal follow failed", e);
+      }
+  };
+
+    const handleBlock = async (targetId) => {
+      if (!confirm("Are you sure? You won't see their posts anymore.")) return;
+      
+      const response = await fetch('http://127.0.0.1:5000/api/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              blocker_id: currentAccountId.value, 
+              blocked_id: targetId 
+          })
+      });
+      const result = await response.json();
+      if (result.success) {
+          showProfileModal.value = false;
+          await fetchFeed(); // Refresh to hide their posts
+      }
+    };
+
+    const handleDeletePost = async (postId) => {
+      if (!confirm("Are you sure you want to delete this post?")) return;
+  
+      try {
+          const response = await fetch(`http://127.0.0.1:5000/api/posts/${postId}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ account_id: currentAccountId.value })
+          });
+          const result = await response.json();
+          if (result.success) {
+              await fetchFeed(); // Refresh the feed to show it's gone
+          }
+      } catch (e) {
+          console.error("Delete post failed", e);
+      }
+  };
+  
+  const handleDeleteComment = async (commentId, postId) => {
+      try {
+          const response = await fetch(`http://127.0.0.1:5000/api/comments/${commentId}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ account_id: currentAccountId.value })
+          });
+          const result = await response.json();
+          if (result.success) {
+              await fetchFeed();
+          }
+      } catch (e) {
+          console.error("Delete comment failed", e);
+      }
+  };
 
     const toggleLike = async (postId) => {
       await fetch(`http://127.0.0.1:5000/api/posts/${postId}/like`, {
@@ -87,26 +215,40 @@ createApp({
       }
     };
 
-    const createNewAccount = async (username) => {
-      try {
-          const response = await fetch('http://127.0.0.1:5000/api/accounts/create', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                  user_id: 1, // Alice's hardcoded ID
-                  username: username 
-              })
-          });
-          const result = await response.json();
-          if (result.success) {
-              await fetchAccounts(); // Refresh list
-              currentAccountId.value = result.account_id; // Switch to new account
-              await fetchFeed();
-          }
-      } catch (error) {
-          console.error("Failed to create account:", error);
+    const fetchCatchUp = async () => {
+      loading.value = true;
+      const response = await fetch('http://127.0.0.1:5000/api/catchup');
+      posts.value = await response.json();
+      loading.value = false;
+  };
+  
+  const fetchGhosts = async () => {
+      const response = await fetch(`http://127.0.0.1:5000/api/ghosts/${currentAccountId.value}`);
+      const ghosts = await response.json();
+      if (ghosts.length === 0) {
+          alert("No ghost followers! Everyone is active.");
+      } else {
+          alert("Inactive followers: " + ghosts.map(g => g.username).join(", "));
       }
-    };
+  };
+  
+  // Update this to match the team's new create_account logic
+  const createNewAccount = async (handle) => {
+      const response = await fetch('http://127.0.0.1:5000/api/accounts/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              user_id: 1, // Alice
+              username: handle // The backend route expects 'username' but saves it as 'handle'
+          })
+      });
+      const result = await response.json();
+      if (result.success) {
+          await fetchAccounts();
+          currentAccountId.value = result.account_id;
+          await fetchFeed();
+      }
+  };
     
     const showProfileModal = ref(false);
     const profileData = ref({ bio: '', age: '', username: '' });
@@ -115,22 +257,33 @@ createApp({
     const accountActivity = ref([]);
 
     const openProfile = async (id) => {
-        const targetId = id || currentAccountId.value;
-        targetAccountId.value = targetId; 
-        
-        try {
-            // Fetch profile info (Bio/Age)
-            const profileRes = await fetch(`http://127.0.0.1:5000/api/users/${targetId}`);
-            profileData.value = await profileRes.json();
-            
-            // Fetch liked/commented activity
-            const activityRes = await fetch(`http://127.0.0.1:5000/api/accounts/${targetId}/activity`);
-            accountActivity.value = await activityRes.json();
-            
-            showProfileModal.value = true;
-        } catch (error) {
-            console.error("Failed to load profile details:", error);
-        }
+      // 1. Determine which ID we are looking at
+      const targetId = id || currentAccountId.value;
+      targetAccountId.value = targetId; 
+      
+      try {
+          // 2. Fetch profile info (Bio/Age)
+          const profileRes = await fetch(`http://127.0.0.1:5000/api/users/${targetId}`);
+          const profileInfo = await profileRes.json(); // Store this in a local variable first
+          
+          // 3. Fetch liked/commented activity
+          const activityRes = await fetch(`http://127.0.0.1:5000/api/accounts/${targetId}/activity`);
+          accountActivity.value = await activityRes.json();
+  
+          // 4. Check our existing feed to see if we already follow this person
+          const knownPost = posts.value.find(p => p.account_id === targetId);
+          
+          // 5. Merge everything into profileData
+          profileData.value = {
+              ...profileInfo,        // Spread the bio/age/username from the API
+              account_id: targetId,  // Use targetId here (not accountId)
+              is_followed: knownPost ? knownPost.is_followed : false
+          };
+          
+          showProfileModal.value = true;
+      } catch (error) {
+          console.error("Failed to load profile details:", error);
+      }
   };
 
     const saveProfile = async () => {
@@ -243,15 +396,26 @@ createApp({
       allAccounts, 
       getActiveUsername, 
       isSubmitting,
+      searchQuery,
+      searchResults,
+      handleSearch,
+      selectUser,
       fetchFeed, 
       submitPost, 
       formatDate,
       openProfile,
       handleAccountChange,
+      handleFollow,
+      handleFollowFromModal,
+      handleBlock,
+      handleDeleteComment,
+      handleDeletePost,
       accountActivity,
       showProfileModal,
       profileData,
       isOwnProfile,
+      fetchCatchUp,
+      fetchGhosts,
       saveProfile,
       toggleLike,
       submitComment

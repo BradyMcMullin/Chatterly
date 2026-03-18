@@ -70,9 +70,8 @@ def api_get_activity(account_id):
 @app.route("/api/accounts", methods=["GET"])
 def api_get_all_accounts():
     conn = social_db.get_db_connection()
-    # This matches the structure of your accounts/users tables
     accounts = conn.execute("""
-        SELECT a.account_id, u.username, u.first_name 
+        SELECT a.account_id, a.handle, u.first_name 
         FROM accounts a 
         JOIN users u ON a.user_id = u.user_id
     """).fetchall()

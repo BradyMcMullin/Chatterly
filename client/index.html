@@ -33,9 +33,39 @@
       </div>
 
       <div v-else class="min-h-screen">
-        <nav class="bg-white border-b p-4 sticky top-0 z-50">
+          <nav class="bg-white border-b p-4 sticky top-0 z-50">
+            <div class="flex gap-4 mb-6">
+                <button @click="fetchCatchUp" class="flex-1 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold hover:bg-amber-100 transition">
+                    🔥 What's Trending? (Last 7 Days)
+                </button>
+                
+                <button @click="fetchGhosts" class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-100 transition">
+                    👻 View Ghost Followers
+                </button>
+            </div>
             <div class="max-w-2xl mx-auto flex justify-between items-center">
-                <h1 class="font-bold text-indigo-600 text-xl tracking-tight">Chatterly</h1>
+                <div class="flex items-center gap-4 flex-1 max-w-md">
+                    <h1 class="font-bold text-indigo-600 text-xl tracking-tight hidden md:block">Chatterly</h1>
+                    
+                    <div class="relative flex-1 group">
+                        <input 
+                            v-model="searchQuery" 
+                            @input="handleSearch"
+                            type="text" 
+                            placeholder="Search handles..." 
+                            class="w-full bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none transition-all"
+                        >
+                        
+                        <div v-if="searchResults.length > 0" class="absolute top-full left-0 right-0 mt-2 bg-white shadow-xl rounded-2xl border border-gray-100 z-[120] overflow-hidden">
+                            <div v-for="user in searchResults" :key="user.account_id" 
+                                 @click="selectUser(user.account_id)"
+                                 class="p-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center border-b last:border-none">
+                                <span class="font-bold text-sm text-gray-800">@{{ user.handle }}</span>
+                                <span class="text-[10px] text-indigo-500 font-bold uppercase">View Profile</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
         
                 <div class="flex items-center gap-6">
                     <div class="flex items-center gap-3 border-r pr-6 border-gray-100">
@@ -67,6 +97,25 @@
         <div v-if="showProfileModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
             <div class="bg-white rounded-2xl w-full max-w-md p-6">
                 <h2 class="text-2xl font-black text-center mb-4">@{{ profileData.username }}</h2>
+                <button 
+                v-if="profileData.account_id !== currentAccountId"
+                @click="handleFollowFromModal(profileData)"
+                :class="[
+                    'w-full py-2.5 rounded-xl font-bold transition-all shadow-sm mb-2',
+                    profileData.is_followed 
+                        ? 'bg-slate-800 text-white' 
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                ]"
+            >
+                {{ profileData.is_followed ? '✓ Following' : 'Follow @' + profileData.username }}
+            </button>
+                <button 
+                v-if="!isOwnProfile" 
+                @click="handleBlock(profileData.account_id)"
+                class="mt-4 w-full py-2 text-xs font-bold text-red-500 border border-red-100 rounded-xl hover:bg-red-50 transition"
+            >
+                🚫 Block @{{ profileData.username }}
+                </button>
                 
                 <div class="space-y-4">
                     <div>
@@ -118,12 +167,34 @@
                 
                 <div class="flex justify-between items-start mb-3">
                     <div class="flex flex-col">
-                        <span 
-                            @click="openProfile(post.account_id)" 
-                            class="font-bold text-indigo-600 hover:underline cursor-pointer text-sm"
-                        >
-                            @{{ post.username }}
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <span 
+                                @click="openProfile(post.account_id)" 
+                                class="font-bold text-indigo-600 hover:underline cursor-pointer text-sm"
+                            >
+                                @{{ post.username }}
+                            </span>
+                            <button 
+                            v-if="post.account_id === currentAccountId" 
+                            @click="handleDeletePost(post.post_id)"
+                            class="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                            <span class="text-xs">Delete Post</span>
+                            </button>
+                            
+                            <button 
+                            v-if="post.account_id !== currentAccountId"
+                            @click="handleFollow(post)"
+                            :class="[
+                                'text-[10px] px-2 py-0.5 rounded-full border transition-all font-bold',
+                                post.is_followed 
+                                    ? 'bg-slate-800 border-slate-800 text-white' 
+                                    : 'border-indigo-200 text-indigo-500 hover:bg-indigo-50'
+                            ]"
+                            >
+                                {{ post.is_followed ? '✓ Followed' : '+ Follow' }}
+                            </button>
+                        </div>
                         <span class="text-gray-400 text-[10px]">{{ formatDate(post.created_at) }}</span>
                     </div>
                 </div>
@@ -153,6 +224,19 @@
                                 <span class="text-[9px] text-gray-400">{{ formatDate(comment.created_at) }}</span>
                             </div>
                             <p class="text-xs text-gray-700 leading-snug">{{ comment.content }}</p>
+                            <div v-for="comment in post.comments" :key="comment.comment_id" class="group flex justify-between">
+                                <p class="text-xs text-gray-600">
+                                    <span class="font-bold">@{{ comment.username }}</span> {{ comment.content }}
+                                </p>
+                                
+                                <button 
+                                    v-if="comment.account_id === currentAccountId || post.account_id === currentAccountId"
+                                    @click="handleDeleteComment(comment.comment_id, post.post_id)"
+                                    class="opacity-0 group-hover:opacity-100 text-[10px] text-red-400 hover:text-red-600 transition"
+                                >
+                                    ✕
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
